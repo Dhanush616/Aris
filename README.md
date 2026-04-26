@@ -1,6 +1,6 @@
 # Aris  
   
-![Aris Interface](screenshot.png)
+![Aris Interface](project%20images/Aris.png)
 
 Aris is a minimalist, terminal-styled chess analysis and playing application built with React, Vite, and Electron. It features a highly focused UI that displays the chessboard and real-time engine evaluations from any modern chess engine without unnecessary visual clutter.  
   
