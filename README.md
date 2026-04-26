@@ -14,7 +14,7 @@ Aris is a minimalist, terminal-styled chess analysis and playing application bui
 ## Core Technologies  
 - **Frontend:** React, Vite, CSS  
 - **Chess Logic:** chess.js, react-chessboard  
-- **Engine Support:** Any modern chess engine (Stockfish.js built-in)  
+- **Engine Support:** Any modern chess engine  
 - **Desktop Environment:** Electron, Electron Forge  
   
 ## Development Setup  
