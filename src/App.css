@@ -1,0 +1,389 @@
+body {
+  overflow-y: auto; /* allow scroll if it gets too tall */
+  margin: 0;
+  padding: 0;
+  background-color: #0b0b0b !important; /* Force true black background everywhere */
+}
+
+.board-container {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 100%;
+  margin: 20px 0;
+  padding: 0 0 0 40px; /* Push to the right corner */
+  box-sizing: border-box;
+}
+
+.chess-layout {
+  display: flex;
+  gap: 50px; /* More spacing between board and text */
+  width: 100%;
+  max-width: 100%; /* Allow spanning full width */
+  align-items: flex-start;
+  text-align: left;
+}
+
+@media (max-width: 800px) {
+  .chess-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+.board-section {
+  flex: 0 0 650px; /* Don't grow beyond the board size */
+  width: 100%;
+  max-width: 650px;
+  touch-action: none;
+}
+
+.side-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  height: 650px; /* Lock to board height */
+  box-sizing: border-box;
+}
+
+.engine-section {
+  flex: 1;
+  background-color: transparent; 
+  border: none; 
+  border-radius: 0;
+  padding: 0;
+  padding-right: 12px; 
+  width: 100%;
+  height: 50%; /* Top half */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.history-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: transparent;
+  border-top: none; /* Removed clean separation */
+  padding-top: 24px;
+  padding-right: 12px;
+  overflow-y: hidden; 
+  height: 50%; /* Bottom half */
+}
+
+.history-header {
+  font-family: var(--heading);
+  font-weight: 600;
+  color: #fff;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  opacity: 0.9;
+  margin-bottom: 12px;
+}
+
+.history-grid {
+  display: block; /* Switch from flex to inline block wrapping */
+  overflow-y: auto;
+  padding: 8px;
+  line-height: 2.2; /* Line spacing to naturally separate variations */
+}
+
+.history-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.history-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.history-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.history-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.history-move-cell {
+  display: inline-block;
+  background: rgba(255,255,255,0.03);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-right: 6px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.history-move-cell:hover {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+.history-move-cell.active {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #fff;
+  font-weight: bold;
+}
+
+.turn-label {
+  color: #555;
+  margin-right: 6px;
+  font-size: 12px;
+}
+
+.variation-block {
+  display: inline;
+  color: #666;
+  font-style: italic;
+}
+
+.variation-paren {
+  display: inline-block;
+  margin: 0 4px;
+  color: #444;
+  font-weight: bold;
+}
+
+.engine-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 24px;
+  border-bottom: none; /* removed subtle separator */
+}
+
+/* Status Dot Animation */
+.engine-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #555;
+  margin-right: 12px;
+  transition: background-color 0.3s;
+}
+.engine-status-dot.thinking {
+  background-color: #fff;
+  animation: pulse 1s infinite alternate;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 4px #aaa, 0 0 10px #aaa; opacity: 1; }
+  100% { box-shadow: 0 0 2px #aaa; opacity: 0.6; }
+}
+
+.engine-title {
+  font-family: var(--heading);
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  opacity: 0.9;
+}
+
+/* Settings Toggle Button */
+.settings-toggle-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #aaa;
+  font-family: var(--heading);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.settings-toggle-btn:hover, .settings-toggle-btn.open {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Glassmorphic Settings Dropdown */
+.settings-dropdown {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  width: 320px;
+  background: rgba(20, 22, 24, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 16px;
+  z-index: 50;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.setting-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: #888;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Tactile Stepper Control */
+.stepper-control {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.stepper-control button {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  font-family: var(--mono);
+  font-size: 14px;
+  width: 32px;
+  height: 28px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.stepper-control button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+.stepper-control span {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: #fff;
+  font-weight: bold;
+  width: 40px;
+  text-align: center;
+  user-select: none;
+}
+
+/* Segmented Pill Group */
+.pill-group {
+  display: flex;
+  gap: 6px;
+}
+
+.pill-btn {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: #aaa;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pill-btn:hover {
+  color: #f3f4f6;
+}
+.pill-btn.active {
+  background: #374151;
+  color: #f3f4f6;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.engine-lines-container {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #0d0f12;
+  border-radius: 8px;
+  border: 1px solid #1c1f26;
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 13px;
+  color: #d1d5db;
+}
+
+/* Custom Scrollbar for Terminal */
+.engine-lines-container::-webkit-scrollbar {
+  width: 8px;
+}
+.engine-lines-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.engine-lines-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.engine-lines-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Line animations */
+@keyframes slideInRight {
+  0% { opacity: 0; transform: translateX(-10px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+.engine-line {
+  background: transparent;
+  padding: 4px 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.engine-main-line {
+  display: inline-block;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.engine-prefix {
+  color: #4b5563;
+  margin-right: 12px;
+  font-weight: bold;
+}
+
+.engine-eval {
+  color: #60a5fa; /* Modern soft blue */
+  margin-right: 12px;
+  font-weight: 700;
+}
+
+.engine-move {
+  margin-right: 8px;
+  transition: color 0.2s;
+  cursor: default;
+}
+.engine-move:hover {
+  color: #ffffff;
+}
+
+.engine-move.capture {
+  color: #f87171; /* Soft modern red */
+}
+
+.engine-meta {
+  color: #6b7280;
+  font-size: 11px;
+  margin-left: 28px;
+}
