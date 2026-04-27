@@ -36,6 +36,7 @@ export default function Click_or_Drag() {
   const [hashMb, setHashMb] = useState(16);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isEngineThinking, setIsEngineThinking] = useState(false);
+  const [boardFlipped, setBoardFlipped] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [isSaveOpen, setIsSaveOpen] = useState(false);
@@ -367,6 +368,7 @@ export default function Click_or_Drag() {
 
   const boardOptions = {
     position,
+    boardOrientation: boardFlipped ? 'black' : 'white',
     darkSquareStyle:  { backgroundColor: DARK_SQUARE_BG },
     lightSquareStyle: { backgroundColor: LIGHT_SQUARE_BG },
     squareStyles,
@@ -554,35 +556,35 @@ export default function Click_or_Drag() {
            userSelect: 'none'
         }}
       >
-        {/* Black progress (top) */}
+        {/* When not flipped: black at top, white at bottom.
+            When flipped (black's view): white at top, black at bottom. */}
         <div style={{
            position: 'absolute',
            top: 0,
            left: 0,
            right: 0,
-           height: `${100 - whiteWinPercent}%`,
-           backgroundColor: '#2b2b2b',
+           height: boardFlipped ? `${whiteWinPercent}%` : `${100 - whiteWinPercent}%`,
+           backgroundColor: boardFlipped ? '#e6e6e6' : '#2b2b2b',
            transition: 'height 0.4s ease-out'
         }}></div>
 
-        {/* White progress (bottom) */}
         <div style={{
            position: 'absolute',
            bottom: 0,
            left: 0,
            right: 0,
-           height: `${whiteWinPercent}%`,
-           backgroundColor: '#e6e6e6',
+           height: boardFlipped ? `${100 - whiteWinPercent}%` : `${whiteWinPercent}%`,
+           backgroundColor: boardFlipped ? '#2b2b2b' : '#e6e6e6',
            transition: 'height 0.4s ease-out'
         }}></div>
 
-        {/* Eval text badge */}
+        {/* Eval text badge — sticks to the winning side's edge */}
         <div style={{
            position: 'absolute',
            width: '100%',
-           top: whiteWinPercent >= 50 ? 'initial' : '10px',
-           bottom: whiteWinPercent >= 50 ? '10px' : 'initial',
-           color: whiteWinPercent >= 50 ? '#111' : '#e6e6e6',
+           top:    (!boardFlipped && whiteWinPercent <  50) || (boardFlipped && whiteWinPercent >= 50) ? '10px' : 'initial',
+           bottom: (!boardFlipped && whiteWinPercent >= 50) || (boardFlipped && whiteWinPercent <  50) ? '10px' : 'initial',
+           color:  whiteWinPercent >= 50 ? '#111' : '#e6e6e6',
            textAlign: 'center',
            fontFamily: 'monospace',
            fontSize: '12px',
@@ -603,17 +605,21 @@ export default function Click_or_Drag() {
         {engineLines.filter(line => line.rawPv).sort((a,b)=>a.multipv-b.multipv).map((line, idx) => {
             const m = line.rawPv.split(' ')[0];
             const from = m.slice(0,2);
-            const to = m.slice(2,4); 
-            const fileIdx = to.charCodeAt(0) - 97; // 'a'
-            const rankIdx = 8 - parseInt(to[1], 10);
+            const to = m.slice(2,4);
+            const fileIdx = to.charCodeAt(0) - 97; // 'a' = 0
+            const rankNum  = parseInt(to[1], 10);   // 1-8
+
+            // Mirror coordinates when board is flipped
+            const col = boardFlipped ? (7 - fileIdx) : fileIdx;
+            const row = boardFlipped ? (rankNum - 1)  : (8 - rankNum);
             
             return (
                <div 
                  key={`overlay-${idx}`} 
                  style={{
                    position: 'absolute',
-                   top: `${rankIdx * 12.5}%`,
-                   left: `${fileIdx * 12.5}%`,
+                   top: `${row * 12.5}%`,
+                   left: `${col * 12.5}%`,
                    width: '12.5%',
                    height: '12.5%',
                    pointerEvents: 'auto',
@@ -778,6 +784,14 @@ export default function Click_or_Drag() {
               <button className="settings-toggle-btn" onClick={() => setIsLibraryOpen(true)}>LOAD</button>
               <button className="settings-toggle-btn" onClick={() => setIsImportOpen(true)}>IMPORT</button>
               <button className="settings-toggle-btn" onClick={exportPgn}>EXPORT</button>
+              <button
+                className="settings-toggle-btn"
+                onClick={() => setBoardFlipped(f => !f)}
+                title="Flip board orientation"
+                style={{ borderColor: boardFlipped ? '#aaa' : undefined, color: boardFlipped ? '#fff' : undefined }}
+              >
+                {boardFlipped ? '⇅ BLACK' : '⇅ WHITE'}
+              </button>
             </div>
           </div>
           <div className="history-grid">
