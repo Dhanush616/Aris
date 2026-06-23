@@ -1,10 +1,10 @@
-import Click_or_Drag from './Click_or_Drag'
+import Main_code from './Main_code'
 import './App.css'
 
 function App() {
   return (
     <div className="board-container">
-      <Click_or_Drag />
+      <Main_code />
     </div>
   )
 }

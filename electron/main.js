@@ -17,6 +17,26 @@ ipcMain.handle('dialog:openFile', async () => {
   return filePaths[0];
 });
 
+ipcMain.handle('dialog:openDbFile', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: 'Open Existing Database',
+    properties: ['openFile'],
+    filters: [{ name: 'JSON Files', extensions: ['json'] }]
+  });
+  if (canceled) return null;
+  return filePaths[0];
+});
+
+ipcMain.handle('dialog:selectDbFile', async () => {
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: 'Select or Create Database File',
+    defaultPath: 'games_database.json',
+    filters: [{ name: 'JSON Files', extensions: ['json'] }]
+  });
+  if (canceled) return null;
+  return filePath;
+});
+
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1200,

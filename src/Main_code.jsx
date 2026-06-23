@@ -2,6 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { Chessboard } from "react-chessboard";
 import { Chess } from "chess.js";
 
+import PgnNode from './components/UI/PgnNode';
+import EvalBar from './components/UI/EvalBar';
+import EnginePanel from './components/UI/EnginePanel';
+import ImportModal from './components/Modals/ImportModal';
+import SaveModal from './components/Modals/SaveModal';
+import LibraryModal from './components/Modals/LibraryModal';
+
 // ── Color scheme – DO NOT change these values ─────────────────────────────
 const DARK_SQUARE_BG  = 'rgb(48, 50, 52)';
 const LIGHT_SQUARE_BG = '#f0d9b5';
@@ -10,7 +17,7 @@ const SELECTED_BG  = 'rgba(255, 215, 0, 0.45)';
 const MOVE_DOT     = 'radial-gradient(circle, rgba(0,0,0,0.25) 27%, transparent 27%)';
 const CAPTURE_RING = 'radial-gradient(circle, transparent 58%, rgba(0,0,0,0.25) 58%)';
 
-export default function Click_or_Drag() {
+export default function Main_code() {
   const chessGameRef = useRef(new Chess());
   const chessGame    = chessGameRef.current;
 
@@ -46,21 +53,38 @@ export default function Click_or_Drag() {
   const [enginePath, setEnginePath] = useState('');
   const [engineName, setEngineName] = useState('No Engine Selected');
   const engineProcessRef = useRef(null);
+  const [dbFilePath, setDbFilePath] = useState('');
 
   useEffect(() => {
     try {
       const storedTheme = localStorage.getItem('chess_engine_path');
       if (storedTheme) setEnginePath(storedTheme);
-      const storedItems = localStorage.getItem('chess_saved_games');
-      if (storedItems) setSavedGames(JSON.parse(storedItems));
-    } catch(e){}
+      
+      const storedDbPath = localStorage.getItem('chess_db_file_path');
+      if (storedDbPath) {
+        setDbFilePath(storedDbPath);
+        const fs = window.require('fs');
+        if (fs.existsSync(storedDbPath)) {
+          const fileData = fs.readFileSync(storedDbPath, 'utf8');
+          setSavedGames(JSON.parse(fileData));
+        } else {
+           localStorage.removeItem('chess_db_file_path');
+           setDbFilePath('');
+           const storedItems = localStorage.getItem('chess_saved_games');
+           if (storedItems) setSavedGames(JSON.parse(storedItems));
+        }
+      } else {
+        const storedItems = localStorage.getItem('chess_saved_games');
+        if (storedItems) setSavedGames(JSON.parse(storedItems));
+      }
+    } catch { /* Ignore error */ }
   }, []);
 
   // Initialize Native Engine CPU stream
   useEffect(() => {
     if (workerRef.current) workerRef.current.terminate();
     if (engineProcessRef.current) {
-        try { engineProcessRef.current.kill(); } catch (e) {}
+        try { engineProcessRef.current.kill(); } catch { /* Ignore error */ }
     }
 
     if (!enginePath) return; // Block evaluation if no native binary assigned
@@ -139,7 +163,7 @@ export default function Click_or_Drag() {
                if (!moveObj) break;
                formattedMoves.push(moveObj.san);
              }
-          } catch(err) {
+          } catch {
              formattedMoves = rawPv.split(' ').slice(0, 15); 
           }
 
@@ -167,17 +191,17 @@ export default function Click_or_Drag() {
 
    const mockWorker = {
       postMessage: (msg) => {
-        try { if (engine.stdin.writable) engine.stdin.write(msg + '\n'); } catch (e) {}
+        try { if (engine.stdin.writable) engine.stdin.write(msg + '\n'); } catch { /* Ignore error */ }
       },
       terminate: () => {
-        try { engine.kill(); } catch (e) {}
+        try { engine.kill(); } catch { /* Ignore error */ }
       }
    };
 
    workerRef.current = mockWorker;
    mockWorker.postMessage('uci');
 
-   } catch (err) {
+   } catch {
       alert("NATIVE ENGINE ERROR: " + err.message);
       console.error("Failed to spawn native engine: " + err.message);
    }
@@ -234,6 +258,7 @@ export default function Click_or_Drag() {
   }, [position, searchDepth, multiPv, threads, hashMb, chessGame, enginePath]);
 
   // ── UI Actions ────────────────────────────────────────────────────────────
+  // Handle an actual move being played on the board and updating the timeline
 
   function handleActualMove(moveObj) {
     if (activeNodeId !== rootId) {
@@ -456,7 +481,7 @@ export default function Click_or_Drag() {
        setPosition(chessGame.fen());
        setIsImportOpen(false);
        setImportText("");
-     } catch (err) {
+     } catch {
        alert("Invalid PGN Format! Cannot import.");
      }
   };
@@ -482,48 +507,23 @@ export default function Click_or_Drag() {
      };
      const updated = [newGame, ...savedGames];
      setSavedGames(updated);
-     localStorage.setItem('chess_saved_games', JSON.stringify(updated));
+     
+     if (dbFilePath) {
+       try {
+         const fs = window.require('fs');
+         fs.writeFileSync(dbFilePath, JSON.stringify(updated, null, 2));
+       } catch (e) {
+         console.error("Failed to write to DB file", e);
+       }
+     } else {
+       localStorage.setItem('chess_saved_games', JSON.stringify(updated));
+     }
+     
      setIsSaveOpen(false);
      setSaveName("");
   };
 
-// ── Recursive PGN Component ───────────────────────────────────────────────
-  const PgnNode = ({ nodeId, showTurn = true }) => {
-     const node = treeNodes[nodeId];
-     if (!node) return null;
 
-     const isWhite = node.depth % 2 !== 0;
-     const turnNum = Math.ceil(node.depth / 2);
-     const isActive = node.id === activeNodeId;
-     
-     const turnStr = isWhite ? `${turnNum}.` : `${turnNum}...`;
-     const forceShowTurn = showTurn || isWhite;
-
-     return (
-       <>
-         {node.id !== rootId && (
-            <span className={`history-move-cell ${isActive ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); setActiveNodeId(node.id); }}>
-               {forceShowTurn && <span className="turn-label">{turnStr}</span>}
-               <span className="san-text">{node.san}</span>
-            </span>
-         )}
-         
-         {node.childrenIds.length > 0 && (
-             <>
-                <PgnNode nodeId={node.childrenIds[0]} showTurn={false} />
-            
-                {node.childrenIds.slice(1).map((childId) => (
-                   <span key={childId} className="variation-block">
-                     <span className="variation-paren">(</span>
-                     <PgnNode nodeId={childId} showTurn={true} />
-                     <span className="variation-paren">)</span>
-                   </span>
-                ))}
-             </>
-         )}
-       </>
-     );
-  };
 
   const bestLine = engineLines.find(l => l.multipv === 1);
   let whiteWinPercent = 50;
@@ -540,62 +540,7 @@ export default function Click_or_Drag() {
 
   return (
     <div className="chess-layout">
-      {/* Eval Bar */}
-      <div 
-        className="eval-bar-container"
-        style={{
-           width: '32px',
-           height: '650px',
-           backgroundColor: '#111',
-           border: '2px solid #333',
-           borderRadius: '6px',
-           display: 'flex',
-           flexDirection: 'column',
-           position: 'relative',
-           overflow: 'hidden',
-           userSelect: 'none'
-        }}
-      >
-        {/* When not flipped: black at top, white at bottom.
-            When flipped (black's view): white at top, black at bottom. */}
-        <div style={{
-           position: 'absolute',
-           top: 0,
-           left: 0,
-           right: 0,
-           height: boardFlipped ? `${whiteWinPercent}%` : `${100 - whiteWinPercent}%`,
-           backgroundColor: boardFlipped ? '#e6e6e6' : '#2b2b2b',
-           transition: 'height 0.4s ease-out'
-        }}></div>
-
-        <div style={{
-           position: 'absolute',
-           bottom: 0,
-           left: 0,
-           right: 0,
-           height: boardFlipped ? `${100 - whiteWinPercent}%` : `${whiteWinPercent}%`,
-           backgroundColor: boardFlipped ? '#2b2b2b' : '#e6e6e6',
-           transition: 'height 0.4s ease-out'
-        }}></div>
-
-        {/* Eval text badge — sticks to the winning side's edge */}
-        <div style={{
-           position: 'absolute',
-           width: '100%',
-           top:    (!boardFlipped && whiteWinPercent <  50) || (boardFlipped && whiteWinPercent >= 50) ? '10px' : 'initial',
-           bottom: (!boardFlipped && whiteWinPercent >= 50) || (boardFlipped && whiteWinPercent <  50) ? '10px' : 'initial',
-           color:  whiteWinPercent >= 50 ? '#111' : '#e6e6e6',
-           textAlign: 'center',
-           fontFamily: 'monospace',
-           fontSize: '12px',
-           fontWeight: 'bold',
-           zIndex: 5,
-           lineHeight: '1.2',
-           padding: '4px 0'
-        }}>
-           {evalText}
-        </div>
-      </div>
+      <EvalBar engineLines={engineLines} boardFlipped={boardFlipped} />
 
       {/* LEFT: Chess Board */}
       <div className="board-section" style={{ position: 'relative' }}>
@@ -660,119 +605,23 @@ export default function Click_or_Drag() {
 
       {/* RIGHT: Engine Panel & History */}
       <div className="side-column">
-        {/* ENGINE */}
-        <div className="engine-section">
-          <div className="engine-header" style={{ position: 'relative' }}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <h3 className="engine-title">{engineName.toUpperCase()}</h3>
-            </div>
-            
-            <button  
-               className={`settings-toggle-btn ${isSettingsOpen ? 'open' : ''}`}
-               onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-               title="Engine Settings"
-            >
-              SETTINGS
-            </button>
-
-            {isSettingsOpen && (
-               <div className="settings-dropdown">
-                  <div className="setting-row" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', marginBottom: '8px', alignItems: 'flex-start' }}>
-                    <div className="setting-label" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                       <span>Engine Executable (.exe)</span>
-                       {enginePath && (
-                         <span style={{ color: '#888', fontSize: '10px', fontFamily: 'monospace', maxWidth: '180px', wordBreak: 'break-all' }}>
-                           ...\{enginePath.split('\\').pop()}
-                         </span>
-                       )}
-                    </div>
-                    <div>
-                      <button 
-                         className="settings-toggle-btn"
-                         style={{ fontSize: '11px', padding: '4px 8px', borderColor: '#aaa' }}
-                         onClick={async () => {
-                            try {
-                              const ipc = window.require('electron').ipcRenderer;
-                              const path = await ipc.invoke('dialog:openFile');
-                              if (path) {
-                                setEnginePath(path);
-                                localStorage.setItem('chess_engine_path', path);
-                              }
-                            } catch (err) {
-                               alert('Failed to launch OS File Picker natively over IPC: ' + err.message);
-                            }
-                         }} 
-                      >
-                         SELECT LOCALLY
-                      </button>
-                    </div>
-                  </div>
-                  <div className="setting-row">
-                    <div className="setting-label">Depth</div>
-                    <div className="stepper-control">
-                      <button onClick={() => setSearchDepth(Math.max(5, searchDepth - 1))}>-</button>
-                      <span>{searchDepth}</span>
-                      <button onClick={() => setSearchDepth(Math.min(30, searchDepth + 1))}>+</button>
-                    </div>
-                  </div>
-                  <div className="setting-row">
-                    <div className="setting-label">Multi-PV</div>
-                    <div className="stepper-control">
-                      <button onClick={() => setMultiPv(Math.max(1, multiPv - 1))}>-</button>
-                      <span>{multiPv}</span>
-                      <button onClick={() => setMultiPv(Math.min(5, multiPv + 1))}>+</button>
-                    </div>
-                  </div>
-                  <div className="setting-row">
-                    <div className="setting-label">Threads</div>
-                    <div className="stepper-control">
-                      <button onClick={() => setThreads(Math.max(1, threads - 1))}>-</button>
-                      <span>{threads}</span>
-                      <button onClick={() => setThreads(Math.min(16, threads + 1))}>+</button>
-                    </div>
-                  </div>
-                  <div className="setting-row">
-                    <div className="setting-label">Hash (MB)</div>
-                    <div className="pill-group">
-                      {[16, 64, 256, 1024].map(val => (
-                        <button 
-                           key={val}
-                           className={`pill-btn ${hashMb === val ? 'active' : ''}`}
-                           onClick={() => setHashMb(val)}
-                        >
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-               </div>
-            )}
-          </div>
-
-          <div className="engine-lines-container">
-            {engineLines.length === 0 && isEngineThinking && (
-              <div style={{color: '#888', fontStyle: 'italic'}}>
-                Analyzing position...
-              </div>
-            )}
-            {engineLines.map(line => (
-              <div key={`m${line.multipv}-d${line.depth}`} className="engine-line">
-                <div className="engine-main-line">
-                  <span className="engine-prefix">&lt;-&gt;</span>
-                  <span className="engine-eval">{line.score}</span>
-                  {line.moves.map((m, i) => (
-                    <span key={i} className={`engine-move ${m.includes('x') ? 'capture' : ''}`}>
-                      {m}
-                    </span>
-                  ))}
-                </div>
-                <div className="engine-meta">
-                  (Depth: {line.depth}, N: {(line.nodes / 1000).toFixed(1)}k, NPS: {(line.nps / 1000).toFixed(1)}k, Time: {(line.time / 1000).toFixed(1)}s)
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <EnginePanel 
+          engineName={engineName}
+          isSettingsOpen={isSettingsOpen}
+          setIsSettingsOpen={setIsSettingsOpen}
+          enginePath={enginePath}
+          setEnginePath={setEnginePath}
+          searchDepth={searchDepth}
+          setSearchDepth={setSearchDepth}
+          multiPv={multiPv}
+          setMultiPv={setMultiPv}
+          threads={threads}
+          setThreads={setThreads}
+          hashMb={hashMb}
+          setHashMb={setHashMb}
+          engineLines={engineLines}
+          isEngineThinking={isEngineThinking}
+        />
 
         {/* MOVE HISTORY TREE */}
         <div className="history-section">
@@ -797,7 +646,7 @@ export default function Click_or_Drag() {
           <div className="history-grid">
              {/* Render from root's first child if it exists */}
              {treeNodes[rootId].childrenIds.length > 0 ? (
-                <PgnNode nodeId={treeNodes[rootId].childrenIds[0]} showTurn={true} />
+                <PgnNode nodeId={treeNodes[rootId].childrenIds[0]} showTurn={true} treeNodes={treeNodes} activeNodeId={activeNodeId} setActiveNodeId={setActiveNodeId} rootId={rootId} />
              ) : (
                 <div style={{color: '#888', fontStyle: 'italic', fontSize: '13px'}}>No moves played yet.</div>
              )}
@@ -806,7 +655,7 @@ export default function Click_or_Drag() {
              {treeNodes[rootId].childrenIds.slice(1).map(childId => (
                 <span key={childId} className="variation-block">
                   <span className="variation-paren">(</span>
-                  <PgnNode nodeId={childId} showTurn={true} />
+                  <PgnNode nodeId={childId} showTurn={true} treeNodes={treeNodes} activeNodeId={activeNodeId} setActiveNodeId={setActiveNodeId} rootId={rootId} />
                   <span className="variation-paren">)</span>
                 </span>
              ))}
@@ -814,119 +663,9 @@ export default function Click_or_Drag() {
         </div>
       </div>
 
-      {/* IMPORT MODAL */}
-      {isImportOpen && (
-        <div style={{
-           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-           background: 'rgba(0,0,0,0.8)', zIndex: 100, 
-           display: 'flex', alignItems: 'center', justifyContent: 'center',
-           backdropFilter: 'blur(4px)'
-        }}>
-           <div style={{
-              background: '#121212', border: '1px solid #333', 
-              padding: '24px', borderRadius: '8px', width: '500px', 
-              display: 'flex', flexDirection: 'column', gap: '16px',
-              fontFamily: 'var(--sans)'
-           }}>
-              <h3 style={{ margin: 0, color: '#fff', fontFamily: 'var(--heading)', letterSpacing: '2px' }}>IMPORT PGN</h3>
-              <textarea 
-                style={{
-                  height: '250px', background: '#0b0b0b', color: '#ccc',
-                  border: '1px solid #333', padding: '12px',
-                  fontFamily: 'var(--mono)', fontSize: '13px', resize: 'none',
-                  outline: 'none', borderRadius: '4px'
-                }}
-                placeholder="Paste external PGN game history here..."
-                value={importText}
-                onChange={e => setImportText(e.target.value)}
-              />
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                 <button className="settings-toggle-btn" onClick={() => setIsImportOpen(false)}>CANCEL</button>
-                 <button className="settings-toggle-btn" onClick={handleImport} style={{ borderColor: '#aaa' }}>LOAD GAME</button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* SAVE MODAL */}
-      {isSaveOpen && (
-        <div style={{
-           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-           background: 'rgba(0,0,0,0.8)', zIndex: 100, 
-           display: 'flex', alignItems: 'center', justifyContent: 'center',
-           backdropFilter: 'blur(4px)'
-        }}>
-           <div style={{
-              background: '#121212', border: '1px solid #333', 
-              padding: '24px', borderRadius: '8px', width: '400px', 
-              display: 'flex', flexDirection: 'column', gap: '16px',
-              fontFamily: 'var(--sans)'
-           }}>
-              <h3 style={{ margin: 0, color: '#fff', fontFamily: 'var(--heading)', letterSpacing: '2px' }}>SAVE GAME</h3>
-              <input 
-                style={{
-                  background: '#0b0b0b', color: '#ccc', border: '1px solid #333', padding: '12px',
-                  fontFamily: 'var(--sans)', fontSize: '14px', outline: 'none', borderRadius: '4px'
-                }}
-                placeholder="Game Title (e.g. My Caro-Kann Study)"
-                value={saveName}
-                onChange={e => setSaveName(e.target.value)}
-                autoFocus
-              />
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                 <button className="settings-toggle-btn" onClick={() => setIsSaveOpen(false)}>CANCEL</button>
-                 <button className="settings-toggle-btn" onClick={handleSaveGame} style={{ borderColor: '#aaa' }}>SAVE</button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* LIBRARY MODAL */}
-      {isLibraryOpen && (
-        <div style={{
-           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-           background: 'rgba(0,0,0,0.8)', zIndex: 100, 
-           display: 'flex', alignItems: 'center', justifyContent: 'center',
-           backdropFilter: 'blur(4px)'
-        }}>
-           <div style={{
-              background: '#121212', border: '1px solid #333', 
-              padding: '24px', borderRadius: '8px', width: '500px', 
-              maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: '16px',
-              fontFamily: 'var(--sans)'
-           }}>
-              <h3 style={{ margin: 0, color: '#fff', fontFamily: 'var(--heading)', letterSpacing: '2px' }}>SAVED GAMES</h3>
-              <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '8px' }}>
-                {savedGames.length === 0 && <span style={{ color: '#888', fontStyle: 'italic', fontSize: '13px' }}>No games saved yet.</span>}
-                {savedGames.map(sg => (
-                  <div key={sg.id} style={{ 
-                     background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '4px',
-                     border: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                  }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                       <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>{sg.name}</span>
-                       <span style={{ color: '#888', fontSize: '11px', fontFamily: 'var(--mono)' }}>{sg.date}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                       <button className="settings-toggle-btn" style={{ fontSize: '10px', padding: '2px 6px' }} onClick={() => {
-                          const updated = savedGames.filter(g => g.id !== sg.id);
-                          setSavedGames(updated);
-                          localStorage.setItem('chess_saved_games', JSON.stringify(updated));
-                       }}>DELETE</button>
-                       <button className="settings-toggle-btn" style={{ borderColor: '#aaa', color: '#fff' }} onClick={() => {
-                          handleImport(sg.pgn);
-                          setIsLibraryOpen(false);
-                       }}>LOAD</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                 <button className="settings-toggle-btn" onClick={() => setIsLibraryOpen(false)}>CLOSE</button>
-              </div>
-           </div>
-        </div>
-      )}
+      <ImportModal isImportOpen={isImportOpen} setIsImportOpen={setIsImportOpen} importText={importText} setImportText={setImportText} handleImport={handleImport} />
+      <SaveModal isSaveOpen={isSaveOpen} setIsSaveOpen={setIsSaveOpen} saveName={saveName} setSaveName={setSaveName} handleSaveGame={handleSaveGame} />
+      <LibraryModal isLibraryOpen={isLibraryOpen} setIsLibraryOpen={setIsLibraryOpen} savedGames={savedGames} setSavedGames={setSavedGames} handleImport={handleImport} dbFilePath={dbFilePath} setDbFilePath={setDbFilePath} />
     </div>
   );
 }
